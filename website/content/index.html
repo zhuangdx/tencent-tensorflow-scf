@@ -83,7 +83,7 @@
         const file = document.querySelector('#select_file').files[0]
         const img = document.querySelector("#img_file");
 
-	var fileExtension = ['jpeg', 'jpg'];
+	    var fileExtension = ['jpeg', 'jpg', 'png'];
         if (!fileExtension.includes(file.name.split('.').pop().toLowerCase())) {
           alert("图片格式不支持。我们目前只支持下列图片文件格式 : "+fileExtension.join(', '));
           return false;
@@ -101,6 +101,40 @@
         document.querySelector('#msg').innerHTML = ''
       }
 
+      // 把image 转换为 canvas对象
+      function postApi(base64) {
+        console.log(base64);
+        $.ajax({
+          url: window.env.API_URL,
+          type: "post",
+          data : base64.split("base64,")[1],
+          dataType: "text",
+          success: function (data) {
+            document.querySelector('#msg').innerHTML = data;
+          },
+          error: function(jqXHR, exception){
+            var msg = 'Generic error';
+            if (jqXHR.status === 0) {
+              msg = 'Not connect.\n Verify Network.';
+            } else if (jqXHR.status == 404) {
+              msg = 'Requested page not found. [404]';
+            } else if (jqXHR.status == 500) {
+              msg = 'Internal Server Error [500].';
+            } else if (exception === 'parsererror') {
+              msg = 'Requested JSON parse failed.';
+            } else if (exception === 'timeout') {
+              msg = 'Time out error.';
+            } else if (exception === 'abort') {
+              msg = 'Ajax request aborted.';
+            } else {
+              msg = 'Uncaught Error.\n' + jqXHR.responseText;
+            }
+            console.log(msg);
+            document.querySelector('#msg').innerHTML = '服务繁忙，请稍后重试';
+          }
+        });
+      }
+
       function identFood() {
         if (document.querySelector('#select_file').files.length === 0) {
           document.querySelector('#msg').innerHTML = '请先选择一张图片'
@@ -108,38 +142,28 @@
         }
         document.querySelector('#msg').innerHTML = '识别中...'
 
+
+
         var reader = new FileReader();
         reader.readAsDataURL(document.querySelector('#select_file').files[0]);
+
         reader.onloadend = function () {
-          $.ajax({
-            url: window.env.API_URL,
-            type: "post",
-            data : reader.result.split("base64,")[1],
-            dataType: "text",
-            success: function (data) {
-              document.querySelector('#msg').innerHTML = data;
-            },
-            error: function(jqXHR, exception){
-              var msg = 'Generic error';
-              if (jqXHR.status === 0) {
-                msg = 'Not connect.\n Verify Network.';
-              } else if (jqXHR.status == 404) {
-                msg = 'Requested page not found. [404]';
-              } else if (jqXHR.status == 500) {
-                msg = 'Internal Server Error [500].';
-              } else if (exception === 'parsererror') {
-                msg = 'Requested JSON parse failed.';
-              } else if (exception === 'timeout') {
-                msg = 'Time out error.';
-              } else if (exception === 'abort') {
-                msg = 'Ajax request aborted.';
-              } else {
-                msg = 'Uncaught Error.\n' + jqXHR.responseText;
-              }
-	      console.log(msg);
-              document.querySelector('#msg').innerHTML = '服务繁忙，请稍后重试';
+          if (reader.result.startsWith('data:image/png')){
+
+            // reader.result.replace('data:image/png', 'data:image/jpeg')
+            var image = new Image();
+            image.src= reader.result;
+            image.onload=function(){
+              var canvas = document.createElement("canvas");
+              canvas.width = image.width;
+              canvas.height = image.height;
+              canvas.getContext("2d").drawImage(image, 0, 0);
+              var src = canvas.toDataURL("image/jpeg");
+              postApi(src)
             }
-          });
+          }else {
+            postApi(reader.result)
+          }
         };
         return false;
       }
